@@ -1,6 +1,10 @@
-[gd_scene load_steps=12 format=3]
+[gd_scene load_steps=16 format=3]
 
 [ext_resource type="Script" path="res://scenes/battle_screen.gd" id="1_script"]
+[ext_resource type="Script" path="res://scenes/combat_hud.gd" id="2_combat_hud"]
+[ext_resource type="Script" path="res://scenes/aiming_system.gd" id="3_aiming"]
+[ext_resource type="Script" path="res://scenes/combat_effects.gd" id="4_effects"]
+[ext_resource type="Script" path="res://scenes/enemy_ai.gd" id="5_enemy_ai"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_hp"]
 bg_color = Color(0.1, 0.7, 0.1, 1)
@@ -410,6 +414,7 @@ polygon = PackedVector2Array(0, 0, 30, -15, 50, 0, 30, 15)
 [node name="FloatingTextLayer" type="Node2D" parent="."]
 
 [node name="HUD" type="CanvasLayer" parent="."]
+script = ExtResource("2_combat_hud")
 
 [node name="Controls" type="MarginContainer" parent="HUD"]
 anchors_preset = 15
@@ -646,6 +651,15 @@ layout_mode = 2
 size_flags_vertical = 8
 theme_override_font_sizes/font_size = 32
 text = "BRACE"
+
+[node name="AimingSystem" type="Node" parent="."]
+script = ExtResource("3_aiming")
+
+[node name="CombatEffects" type="Node" parent="."]
+script = ExtResource("4_effects")
+
+[node name="EnemyAI" type="Node" parent="."]
+script = ExtResource("5_enemy_ai")
 
 [connection signal="pressed" from="HUD/Controls/BottomUI/HBox/AmmoSection/AmmoButtons/Standard" to="." method="_on_ammo_type_pressed" binds= ["STANDARD"]]
 [connection signal="pressed" from="HUD/Controls/BottomUI/HBox/AmmoSection/AmmoButtons/AP" to="." method="_on_ammo_type_pressed" binds= ["AP"]]
