@@ -1,4 +1,4 @@
-[gd_scene load_steps=8 format=3]
+[gd_scene load_steps=12 format=3]
 
 [ext_resource type="Script" path="res://scenes/battle_screen.gd" id="1_script"]
 
@@ -46,16 +46,36 @@ corner_radius_top_right = 8
 corner_radius_bottom_right = 8
 corner_radius_bottom_left = 8
 
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_aim"]
-bg_color = Color(1, 0.8, 0.2, 1)
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_aim_panel"]
+bg_color = Color(0.08, 0.08, 0.1, 0.9)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.4, 0.4, 0.5, 1)
+corner_radius_top_left = 4
+corner_radius_top_right = 4
+corner_radius_bottom_right = 4
+corner_radius_bottom_left = 4
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_bar_bg"]
+bg_color = Color(0.05, 0.05, 0.05, 1)
 border_width_left = 1
 border_width_top = 1
 border_width_right = 1
 border_width_bottom = 1
-border_color = Color(0, 0, 0, 1)
+border_color = Color(0.2, 0.2, 0.2, 1)
 
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_charge"]
-bg_color = Color(0.2, 0.6, 1, 1)
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_power_fill"]
+bg_color = Color(1, 0.4, 0.2, 1)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(1, 1, 1, 0.2)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_aim"]
+bg_color = Color(1, 0.8, 0.2, 1)
 border_width_left = 1
 border_width_top = 1
 border_width_right = 1
@@ -204,6 +224,9 @@ offset_right = 130.0
 offset_bottom = 25.0
 color = Color(0.1, 0.1, 0.1, 1)
 
+[node name="MuzzleMarker" type="Marker2D" parent="Mechs/PlayerMech/MainCannon/Barrel/Muzzle"]
+position = Vector2(20, 15)
+
 [node name="EnemyMech" type="Node2D" parent="Mechs"]
 position = Vector2(1060, 530)
 scale = Vector2(-0.75, 0.75)
@@ -315,13 +338,28 @@ offset_right = 80.0
 offset_bottom = 10.0
 color = Color(0, 0, 1, 0.3)
 
-[node name="Shell" type="ColorRect" parent="."]
+[node name="FiringLine" type="Line2D" parent="."]
 visible = false
-offset_left = -10.0
-offset_top = -5.0
-offset_right = 10.0
-offset_bottom = 5.0
+points = PackedVector2Array(0, 0, 0, 0)
+width = 6.0
+default_color = Color(1, 1, 1, 0.4)
+
+[node name="AimReticle" type="Node2D" parent="."]
+visible = false
+
+[node name="Circle" type="Polygon2D" parent="AimReticle"]
+color = Color(1, 1, 1, 1)
+polygon = PackedVector2Array(0, -8, 6, -6, 8, 0, 6, 6, 0, 8, -6, 6, -8, 0, -6, -6)
+
+[node name="Shell" type="Polygon2D" parent="."]
+visible = false
 color = Color(1, 1, 0.4, 1)
+polygon = PackedVector2Array(-20, -5, 20, -5, 25, 0, 20, 5, -20, 5)
+
+[node name="EnemyShell" type="Polygon2D" parent="."]
+visible = false
+color = Color(1, 0.3, 0.2, 1)
+polygon = PackedVector2Array(-15, -4, 15, -4, 20, 0, 15, 4, -15, 4)
 
 [node name="ImpactFlash" type="ColorRect" parent="."]
 visible = false
@@ -331,14 +369,6 @@ offset_right = 20.0
 offset_bottom = 20.0
 color = Color(1, 1, 1, 1)
 
-[node name="EnemyShell" type="ColorRect" parent="."]
-visible = false
-offset_left = -10.0
-offset_top = -5.0
-offset_right = 10.0
-offset_bottom = 5.0
-color = Color(1, 0.3, 0.2, 1)
-
 [node name="EnemyImpactFlash" type="ColorRect" parent="."]
 visible = false
 offset_left = -20.0
@@ -346,22 +376,6 @@ offset_top = -20.0
 offset_right = 20.0
 offset_bottom = 20.0
 color = Color(1, 0.5, 0.2, 1)
-
-[node name="AimArc" type="Line2D" parent="."]
-width = 4.0
-default_color = Color(0.2, 0.6, 1, 0.4)
-joint_mode = 2
-begin_cap_mode = 2
-end_cap_mode = 2
-antialiased = true
-
-[node name="LandingIndicator" type="ColorRect" parent="."]
-visible = false
-offset_left = -10.0
-offset_top = -2.0
-offset_right = 10.0
-offset_bottom = 2.0
-color = Color(0.2, 0.6, 1, 0.6)
 
 [node name="HitMarker" type="Node2D" parent="."]
 visible = false
@@ -379,6 +393,11 @@ offset_top = -1.0
 offset_right = 10.0
 offset_bottom = 1.0
 color = Color(1, 0, 1, 1)
+
+[node name="MuzzleFlash" type="Polygon2D" parent="."]
+visible = false
+color = Color(1, 0.9, 0.2, 1)
+polygon = PackedVector2Array(0, 0, 30, -15, 50, 0, 30, 15)
 
 [node name="HUD" type="CanvasLayer" parent="."]
 
@@ -454,6 +473,85 @@ value = 0.0
 fill_mode = 1
 show_percentage = false
 
+[node name="AimingFeedback" type="VBoxContainer" parent="HUD/Controls"]
+layout_mode = 2
+size_flags_horizontal = 4
+size_flags_vertical = 8
+theme_override_constants/separation = 10
+alignment = 1
+
+[node name="ResultLabel" type="Label" parent="HUD/Controls/AimingFeedback"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.9, 0.2, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 4
+theme_override_font_sizes/font_size = 18
+horizontal_alignment = 1
+
+[node name="DebugLabel" type="Label" parent="HUD/Controls/AimingFeedback"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0, 1, 1)
+theme_override_font_sizes/font_size = 12
+text = "LAST IMPACT: NONE"
+horizontal_alignment = 1
+
+[node name="TargetLabel" type="Label" parent="HUD/Controls/AimingFeedback"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.6, 0.8, 1, 1)
+theme_override_font_sizes/font_size = 14
+text = "TARGET: TORSO"
+horizontal_alignment = 1
+
+[node name="AimingPanel" type="PanelContainer" parent="HUD/Controls/AimingFeedback"]
+custom_minimum_size = Vector2(400, 80)
+layout_mode = 2
+size_flags_horizontal = 4
+theme_override_styles/panel = SubResource("StyleBoxFlat_aim_panel")
+
+[node name="VBox" type="VBoxContainer" parent="HUD/Controls/AimingFeedback/AimingPanel"]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="Header" type="Label" parent="HUD/Controls/AimingFeedback/AimingPanel/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.6, 0.8, 1, 1)
+theme_override_font_sizes/font_size = 14
+text = "CANNON PRESSURE"
+horizontal_alignment = 1
+
+[node name="Instruction" type="Label" parent="HUD/Controls/AimingFeedback/AimingPanel/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.2, 0.1, 1)
+theme_override_font_sizes/font_size = 12
+text = "OVERPRESSURE"
+horizontal_alignment = 1
+
+[node name="GaugeBox" type="Control" parent="HUD/Controls/AimingFeedback/AimingPanel/VBox"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="PowerBar" type="ProgressBar" parent="HUD/Controls/AimingFeedback/AimingPanel/VBox/GaugeBox"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -150.0
+offset_top = -10.0
+offset_right = 150.0
+offset_bottom = 10.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_styles/background = SubResource("StyleBoxFlat_bar_bg")
+theme_override_styles/fill = SubResource("StyleBoxFlat_power_fill")
+max_value = 1.0
+show_percentage = false
+
+[node name="Spacer" type="Control" parent="HUD/Controls/AimingFeedback"]
+custom_minimum_size = Vector2(0, 160)
+layout_mode = 2
+
 [node name="BottomUI" type="PanelContainer" parent="HUD/Controls"]
 layout_mode = 2
 size_flags_vertical = 8
@@ -505,15 +603,8 @@ text = "SELECTED: STANDARD"
 [node name="FireContainer" type="VBoxContainer" parent="HUD/Controls/BottomUI/HBox"]
 layout_mode = 2
 size_flags_horizontal = 3
+theme_override_constants/separation = 10
 alignment = 1
-
-[node name="ChargeBar" type="ProgressBar" parent="HUD/Controls/BottomUI/HBox/FireContainer"]
-custom_minimum_size = Vector2(280, 10)
-layout_mode = 2
-size_flags_horizontal = 4
-theme_override_styles/fill = SubResource("StyleBoxFlat_charge")
-max_value = 1.0
-show_percentage = false
 
 [node name="FireButton" type="Button" parent="HUD/Controls/BottomUI/HBox/FireContainer"]
 custom_minimum_size = Vector2(280, 140)
@@ -532,14 +623,6 @@ layout_mode = 2
 size_flags_vertical = 8
 theme_override_font_sizes/font_size = 32
 text = "BRACE"
-
-[node name="DebugLabel" type="Label" parent="HUD/Controls"]
-layout_mode = 2
-size_flags_vertical = 1
-theme_override_colors/font_color = Color(1, 0, 1, 1)
-theme_override_font_sizes/font_size = 12
-text = "LAST IMPACT: NONE"
-vertical_alignment = 2
 
 [connection signal="pressed" from="HUD/Controls/BottomUI/HBox/AmmoSection/AmmoButtons/Standard" to="." method="_on_ammo_type_pressed" binds= ["STANDARD"]]
 [connection signal="pressed" from="HUD/Controls/BottomUI/HBox/AmmoSection/AmmoButtons/AP" to="." method="_on_ammo_type_pressed" binds= ["AP"]]
