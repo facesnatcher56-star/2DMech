@@ -1,8 +1,12 @@
 extends Node2D
 
+# State Machine
+enum CombatState { PLAYER_TURN, PLAYER_AIMING, PLAYER_RESOLVING, ENEMY_TURN, ENEMY_RESOLVING, BATTLE_OVER }
+
 @onready var player_hp_bar = $HUD/Controls/TopUI/PlayerHP/ProgressBar
 @onready var enemy_hp_bar = $HUD/Controls/TopUI/EnemyHP/ProgressBar
-@onready var enemy_aim_bar = $HUD/Controls/TopUI/EnemyHP/AimBar
+@onready var round_label = $HUD/Controls/TopUI/CenterBox/RoundLabel
+@onready var turn_label = $HUD/Controls/TopUI/CenterBox/TurnLabel
 @onready var ammo_buttons_container = $HUD/Controls/BottomUI/HBox/AmmoSection/AmmoButtons
 
 @onready var aiming_panel = $HUD/Controls/AimingFeedback/AimingPanel
@@ -35,10 +39,14 @@ const AMMO_CONFIG = {
 }
 
 # State variables
+var current_state = CombatState.PLAYER_TURN
 var selected_ammo: String = "STANDARD"
 var selected_target_zone: String = "TORSO"
 var player_hp: float = 100.0
 var enemy_hp: float = 100.0
+var current_round: int = 1
+var player_bracing: bool = false
+
 var battle_over: bool = false
 
 # Pressure System State
@@ -46,19 +54,14 @@ var is_charging: bool = false
 var power_value: float = 0.0
 var base_charge_time: float = 2.0
 var projected_hit_point: Vector2 = Vector2.ZERO
-var shot_resolving: bool = false
-
-# Enemy AI
-var enemy_aim_timer: float = 0.0
-var enemy_aim_duration: float = 5.0
 
 func _ready() -> void:
 	_reset_ui()
 	player_hp_bar.value = player_hp
 	enemy_hp_bar.value = enemy_hp
-	_start_enemy_aim_cycle()
 	_update_target_visuals()
 	_on_ammo_type_pressed("STANDARD")
+	_update_turn_ui()
 
 func _reset_ui():
 	aiming_panel.hide()
@@ -73,7 +76,7 @@ func _reset_ui():
 	target_label.hide()
 
 func _input(event: InputEvent) -> void:
-	if battle_over or is_charging: return
+	if current_state != CombatState.PLAYER_TURN or is_charging: return
 	if event is InputEventMouseButton and event.pressed:
 		var hit = _check_collision_point(get_global_mouse_position())
 		if hit != "":
@@ -81,16 +84,29 @@ func _input(event: InputEvent) -> void:
 			_update_target_visuals()
 
 func _process(delta: float) -> void:
-	if battle_over: return
+	if current_state == CombatState.BATTLE_OVER: return
 	if is_charging: _update_aiming_logic(delta)
-	_update_enemy_ai(delta)
+
+func _update_turn_ui():
+	round_label.text = "ROUND " + str(current_round)
+	match current_state:
+		CombatState.PLAYER_TURN:
+			turn_label.text = "PLAYER TURN"
+			turn_label.modulate = Color(0.6, 0.8, 1.0)
+		CombatState.ENEMY_TURN:
+			turn_label.text = "ENEMY TURN"
+			turn_label.modulate = Color(1.0, 0.4, 0.4)
+		CombatState.BATTLE_OVER:
+			turn_label.text = "BATTLE OVER"
+			turn_label.modulate = Color(1, 1, 1)
+		_:
+			turn_label.text = ""
 
 func _update_aiming_logic(delta: float):
 	var config = AMMO_CONFIG[selected_ammo]
 	power_value += delta / (base_charge_time / config.charge_mult)
 	power_value = clamp(power_value, 0.0, 1.0)
 	power_bar.value = power_value
-	
 	aiming_instr.visible = power_value > 0.85
 	
 	var time = Time.get_ticks_msec() / 1000.0
@@ -100,17 +116,13 @@ func _update_aiming_logic(delta: float):
 	var speed_b = lerp(2.0, 9.0, power_value)
 	var speed_drift = 0.5 
 	
-	var wobble = sin(time * speed_a) * amp 
-	wobble += sin(time * speed_b) * (amp * 0.4)
-	wobble += sin(time * speed_drift) * (amp * 0.2)
-	
+	var wobble = sin(time * speed_a) * amp + sin(time * speed_b) * (amp * 0.4) + sin(time * speed_drift) * (amp * 0.2)
 	var base_target = _get_zone_center(selected_target_zone)
 	projected_hit_point = base_target + Vector2(0, wobble)
 	
 	firing_line.show()
 	firing_line.set_point_position(0, player_muzzle.global_position)
 	firing_line.set_point_position(1, projected_hit_point)
-	
 	aim_reticle.show()
 	aim_reticle.global_position = projected_hit_point
 	
@@ -120,7 +132,8 @@ func _update_aiming_logic(delta: float):
 	aim_reticle.get_node("Circle").modulate = r_color
 
 func _on_fire_down():
-	if battle_over or shot_resolving: return
+	if current_state != CombatState.PLAYER_TURN or battle_over: return
+	current_state = CombatState.PLAYER_AIMING
 	is_charging = true
 	power_value = 0.0
 	aiming_panel.show()
@@ -136,12 +149,18 @@ func _on_fire_up():
 	aim_reticle.hide()
 	_resolve_player_shot()
 
+func _on_brace_pressed():
+	if current_state != CombatState.PLAYER_TURN: return
+	player_bracing = true
+	_spawn_floating_text("BRACING", player_torso.global_position, Color.CYAN)
+	_end_player_turn()
+
 func _resolve_player_shot():
-	shot_resolving = true
+	current_state = CombatState.PLAYER_RESOLVING
 	var mult = _get_power_multiplier(power_value)
 	var final_mult = mult * AMMO_CONFIG[selected_ammo].dmg_mult
 	var hit_zone = _check_collision_point(projected_hit_point)
-	_fire_tracer(projected_hit_point, hit_zone, final_mult)
+	_fire_player_tracer(projected_hit_point, hit_zone, final_mult)
 
 func _get_power_multiplier(val: float) -> float:
 	if val < 0.25: return 0.65
@@ -149,7 +168,7 @@ func _get_power_multiplier(val: float) -> float:
 	if val < 0.85: return 1.35
 	return 1.75
 
-func _fire_tracer(target: Vector2, hit_zone: String, scale: float):
+func _fire_player_tracer(target: Vector2, hit_zone: String, scale: float):
 	muzzle_flash.global_position = player_muzzle.global_position
 	muzzle_flash.show()
 	var original_pos = player_mech.position
@@ -163,27 +182,105 @@ func _fire_tracer(target: Vector2, hit_zone: String, scale: float):
 	
 	var bt = create_tween()
 	bt.tween_property(shell, "global_position", target, 0.1)
-	bt.tween_callback(func(): _on_impact(target, hit_zone, scale))
+	bt.tween_callback(func(): _on_player_impact(target, hit_zone, scale))
 	
 	var ft = create_tween()
 	ft.tween_interval(0.1)
 	ft.tween_callback(muzzle_flash.hide)
 
-func _on_impact(pos: Vector2, hit_zone: String, scale: float):
+func _on_player_impact(pos: Vector2, hit_zone: String, scale: float):
 	shell.hide()
 	_show_impact(impact_flash, pos)
 	if hit_zone != "":
 		var base = AMMO_CONFIG[selected_ammo].damage[hit_zone]
 		var total = max(1.0, base * scale)
-		var prefix = "OVERPOWER " if power_value > 0.85 else ""
 		if selected_ammo == "HE": total += 4
+		
 		enemy_hp -= total
 		enemy_hp_bar.value = enemy_hp
-		result_label.text = prefix + "HIT " + hit_zone + " - " + str(int(total)) + " DMG"
-		if enemy_hp <= 0: battle_over = true
+		_spawn_floating_text("-" + str(int(total)), pos, Color.ORANGE)
+		result_label.text = "HIT " + hit_zone + " - " + str(int(total)) + " DMG"
+		
+		if enemy_hp <= 0:
+			_end_battle(true)
+			return
 	else:
+		_spawn_floating_text("MISS", pos, Color.GRAY)
 		result_label.text = "MISS"
-	shot_resolving = false
+	
+	_end_player_turn()
+
+func _end_player_turn():
+	current_state = CombatState.ENEMY_TURN
+	_update_turn_ui()
+	get_tree().create_timer(1.2).timeout.connect(_start_enemy_action)
+
+func _start_enemy_action():
+	if current_state != CombatState.ENEMY_TURN: return
+	current_state = CombatState.ENEMY_RESOLVING
+	
+	var tween = create_tween()
+	enemy_shell.global_position = enemy_muzzle.global_position
+	enemy_shell.show()
+	tween.tween_property(enemy_shell, "global_position", player_torso.global_position, 0.3)
+	tween.tween_callback(_on_enemy_impact)
+
+func _on_enemy_impact():
+	enemy_shell.hide()
+	_show_impact(enemy_impact_flash, player_torso.global_position)
+	
+	var damage = 10.0
+	var text = "-" + str(int(damage))
+	var color = Color.RED
+	
+	if player_bracing:
+		damage *= 0.5
+		text = "BRACED -" + str(int(damage))
+		color = Color.CYAN
+		player_bracing = false
+	
+	player_hp -= damage
+	player_hp_bar.value = player_hp
+	_spawn_floating_text(text, player_torso.global_position, color)
+	
+	if player_hp <= 0:
+		_end_battle(false)
+		return
+	
+	current_round += 1
+	current_state = CombatState.PLAYER_TURN
+	_update_turn_ui()
+
+func _end_battle(victory: bool):
+	current_state = CombatState.BATTLE_OVER
+	_update_turn_ui()
+	result_label.text = "VICTORY!" if victory else "DEFEAT"
+	battle_over = true
+
+func _spawn_floating_text(text: String, pos: Vector2, color: Color):
+	var label = Label.new()
+	label.text = text
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	label.position = pos + Vector2(randf_range(-20, 20), -40)
+	label.add_theme_color_override("font_color", color)
+	label.add_theme_font_size_override("font_size", 28)
+	label.add_theme_constant_override("outline_size", 6)
+	label.add_theme_color_override("font_outline_color", Color.BLACK)
+	add_child(label)
+	
+	var t = create_tween()
+	t.set_parallel(true)
+	t.tween_property(label, "position:y", label.position.y - 80, 1.0).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	t.tween_property(label, "modulate:a", 0.0, 1.0).set_delay(0.2)
+	t.set_parallel(false)
+	t.tween_callback(label.queue_free)
+
+func _show_impact(flash: Control, pos: Vector2):
+	flash.global_position = pos
+	flash.modulate.a = 1.0
+	flash.show()
+	create_tween().tween_property(flash, "modulate:a", 0.0, 0.15).finished.connect(flash.hide)
 
 func _check_collision_point(pos: Vector2) -> String:
 	for zone in enemy_zones_container.get_children():
@@ -201,49 +298,13 @@ func _get_zone_center(zone_name: String) -> Vector2:
 func _update_target_visuals():
 	for zone in enemy_zones_container.get_children():
 		var zn = zone.name.replace("Zone", "").to_upper()
-		if zn == selected_target_zone:
-			zone.visible = true
-			zone.modulate = Color(1, 1, 1, 0.4)
-		else:
-			zone.visible = false
-			zone.modulate = Color(1, 1, 1, 0.3)
-
-func _update_enemy_ai(delta):
-	if battle_over: return
-	enemy_aim_timer += delta
-	enemy_aim_bar.value = enemy_aim_timer / enemy_aim_duration
-	if enemy_aim_timer >= enemy_aim_duration: _fire_enemy_shell()
-
-func _start_enemy_aim_cycle():
-	enemy_aim_timer = 0.0
-	enemy_aim_duration = randf_range(4.0, 8.0)
-
-func _fire_enemy_shell():
-	_start_enemy_aim_cycle()
-	var tween = create_tween()
-	enemy_shell.global_position = enemy_muzzle.global_position
-	enemy_shell.show()
-	tween.tween_property(enemy_shell, "global_position", player_torso.global_position, 0.3)
-	tween.tween_callback(func():
-		enemy_shell.hide()
-		_show_impact(enemy_impact_flash, player_torso.global_position)
-		player_hp -= 10
-		player_hp_bar.value = player_hp
-		if player_hp <= 0: battle_over = true
-	)
-
-func _show_impact(flash: Control, pos: Vector2):
-	flash.global_position = pos
-	flash.modulate.a = 1.0
-	flash.show()
-	create_tween().tween_property(flash, "modulate:a", 0.0, 0.15).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT).finished.connect(flash.hide)
+		zone.visible = (zn == selected_target_zone)
+		zone.modulate = Color(1, 1, 1, 0.4)
 
 func _on_ammo_type_pressed(type: String):
+	if current_state != CombatState.PLAYER_TURN: return
 	selected_ammo = type
-	var ammo_label = $HUD/Controls/BottomUI/HBox/AmmoSection/SelectedAmmoLabel
-	if ammo_label: ammo_label.text = "SELECTED: " + type
+	$HUD/Controls/BottomUI/HBox/AmmoSection/SelectedAmmoLabel.text = "SELECTED: " + type
 	for button in ammo_buttons_container.get_children():
 		if button is Button:
 			button.modulate = Color(1.6, 1.6, 1.2) if button.name.to_upper() == type else Color(1, 1, 1)
-
-func _on_brace_pressed(): pass

@@ -394,10 +394,20 @@ offset_right = 10.0
 offset_bottom = 1.0
 color = Color(1, 0, 1, 1)
 
+[node name="LandingIndicator" type="ColorRect" parent="."]
+visible = false
+offset_left = -10.0
+offset_top = -2.0
+offset_right = 10.0
+offset_bottom = 2.0
+color = Color(0.2, 0.6, 1, 0.6)
+
 [node name="MuzzleFlash" type="Polygon2D" parent="."]
 visible = false
 color = Color(1, 0.9, 0.2, 1)
 polygon = PackedVector2Array(0, 0, 30, -15, 50, 0, 30, 15)
+
+[node name="FloatingTextLayer" type="Node2D" parent="."]
 
 [node name="HUD" type="CanvasLayer" parent="."]
 
@@ -435,13 +445,25 @@ theme_override_styles/fill = SubResource("StyleBoxFlat_hp")
 value = 100.0
 show_percentage = false
 
-[node name="RoundLabel" type="Label" parent="HUD/Controls/TopUI"]
+[node name="CenterBox" type="VBoxContainer" parent="HUD/Controls/TopUI"]
 layout_mode = 2
 size_flags_horizontal = 3
+
+[node name="RoundLabel" type="Label" parent="HUD/Controls/TopUI/CenterBox"]
+layout_mode = 2
 theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
 theme_override_constants/outline_size = 8
 theme_override_font_sizes/font_size = 36
 text = "ROUND 1"
+horizontal_alignment = 1
+
+[node name="TurnLabel" type="Label" parent="HUD/Controls/TopUI/CenterBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.6, 0.8, 1, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 4
+theme_override_font_sizes/font_size = 18
+text = "PLAYER TURN"
 horizontal_alignment = 1
 
 [node name="EnemyHP" type="VBoxContainer" parent="HUD/Controls/TopUI"]
@@ -465,6 +487,7 @@ fill_mode = 1
 show_percentage = false
 
 [node name="AimBar" type="ProgressBar" parent="HUD/Controls/TopUI/EnemyHP"]
+visible = false
 custom_minimum_size = Vector2(0, 8)
 layout_mode = 2
 theme_override_styles/fill = SubResource("StyleBoxFlat_aim")
